@@ -3,6 +3,7 @@ import { PGlite, type Transaction } from "@electric-sql/pglite";
 import { DEMO_ACCOUNTS, DEMO_PASSWORD } from "@/lib/demo-accounts";
 import { addDays, istDate, slotWindowsForDay, type TicketStatus } from "@/lib/domain";
 import { hashPassword } from "../passwords";
+import { seedId, slotId } from "./ids";
 import { SCHEMA_SQL } from "./schema";
 
 type DishSeed = {
@@ -56,9 +57,9 @@ async function seed(tx: Transaction, passwordHash: string, now: number): Promise
   const dishes = new Map<string, DishRow>();
   for (const d of DISHES) {
     const { rows } = await tx.query<DishRow>(
-      `INSERT INTO dishes (name, description, category, counter, price_paise, stock, prep_minutes, is_veg, emoji)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, name, counter, price_paise`,
-      [d.name, d.description, d.category, d.counter, d.rupees * 100, d.stock, d.prep, d.veg, d.emoji],
+      `INSERT INTO dishes (id, name, description, category, counter, price_paise, stock, prep_minutes, is_veg, emoji)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, name, counter, price_paise`,
+      [seedId("dish", d.name), d.name, d.description, d.category, d.counter, d.rupees * 100, d.stock, d.prep, d.veg, d.emoji],
     );
     dishes.set(d.name, rows[0]);
   }
@@ -67,7 +68,8 @@ async function seed(tx: Transaction, passwordHash: string, now: number): Promise
   const today = istDate(now);
   for (const date of [today, addDays(today, 1)]) {
     for (const w of slotWindowsForDay(date, "07:00", "23:00", 15)) {
-      await tx.query("INSERT INTO pickup_slots (starts_at, ends_at, capacity) VALUES ($1, $2, 25)", [
+      await tx.query("INSERT INTO pickup_slots (id, starts_at, ends_at, capacity) VALUES ($1, $2, $3, 25)", [
+        slotId(w.startsAt),
         w.startsAt.toISOString(),
         w.endsAt.toISOString(),
       ]);
@@ -79,9 +81,9 @@ async function seed(tx: Transaction, passwordHash: string, now: number): Promise
   );
   const pastStart = new Date(Math.floor((now - 2 * HOUR) / (15 * 60_000)) * 15 * 60_000);
   const past = await tx.query<{ id: string }>(
-    `INSERT INTO pickup_slots (starts_at, ends_at, capacity) VALUES ($1, $2, 25)
+    `INSERT INTO pickup_slots (id, starts_at, ends_at, capacity) VALUES ($1, $2, $3, 25)
      ON CONFLICT (starts_at) DO UPDATE SET capacity = pickup_slots.capacity RETURNING id`,
-    [pastStart.toISOString(), new Date(pastStart.getTime() + 15 * 60_000).toISOString()],
+    [slotId(pastStart), pastStart.toISOString(), new Date(pastStart.getTime() + 15 * 60_000).toISOString()],
   );
   const slotIds = upcoming.rows.map((r) => r.id);
   const pastSlotId = past.rows[0].id;
@@ -92,10 +94,10 @@ async function seed(tx: Transaction, passwordHash: string, now: number): Promise
   }): Promise<string[]> {
     const total = o.lines.reduce((s, l) => s + dishes.get(l.dish)!.price_paise * l.qty, 0);
     const { rows } = await tx.query<{ id: string }>(
-      `INSERT INTO orders (code, user_id, slot_id, total_paise, status, payment_method, payment_ref, hold_expires_at, paid_at, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+      `INSERT INTO orders (id, code, user_id, slot_id, total_paise, status, payment_method, payment_ref, hold_expires_at, paid_at, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
       [
-        o.code, student.id, o.slotId, total, o.status,
+        seedId("order", o.code), o.code, student.id, o.slotId, total, o.status,
         o.paid ? "UPI_MOCK" : null, o.paid ? `PAY_${o.code}` : null,
         new Date(o.holdUntil).toISOString(), o.paid ? new Date(o.createdAt + 60_000).toISOString() : null,
         new Date(o.createdAt).toISOString(),
@@ -107,17 +109,17 @@ async function seed(tx: Transaction, passwordHash: string, now: number): Promise
     const ticketIds: string[] = [];
     for (const l of o.lines) {
       const dish = dishes.get(l.dish)!;
-      await tx.query("INSERT INTO order_items (order_id, dish_id, qty, unit_paise) VALUES ($1, $2, $3, $4)", [
-        orderId, dish.id, l.qty, dish.price_paise,
+      await tx.query("INSERT INTO order_items (id, order_id, dish_id, qty, unit_paise) VALUES ($1, $2, $3, $4, $5)", [
+        seedId("item", o.code, l.dish), orderId, dish.id, l.qty, dish.price_paise,
       ]);
       await tx.query("UPDATE dishes SET stock = stock - $1 WHERE id = $2", [l.qty, dish.id]);
       const at = (status: TicketStatus[]) => (status.includes(l.ticket) ? new Date(o.createdAt + 5 * 60_000).toISOString() : null);
       const t = await tx.query<{ id: string }>(
-        `INSERT INTO tickets (order_id, user_id, dish_id, dish_name, counter, qty, amount_paise, status, expires_at,
+        `INSERT INTO tickets (id, order_id, user_id, dish_id, dish_name, counter, qty, amount_paise, status, expires_at,
                               preparing_at, ready_at, redeemed_at, redeemed_by, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id`,
         [
-          orderId, student.id, dish.id, dish.name, dish.counter, l.qty, dish.price_paise * l.qty, l.ticket,
+          seedId("ticket", o.code, l.dish), orderId, student.id, dish.id, dish.name, dish.counter, l.qty, dish.price_paise * l.qty, l.ticket,
           new Date(o.ticketsExpire).toISOString(),
           at(["PREPARING", "READY", "REDEEMED", "EXPIRED"]), at(["READY", "REDEEMED", "EXPIRED"]),
           l.ticket === "REDEEMED" ? new Date(o.createdAt + 30 * 60_000).toISOString() : null,

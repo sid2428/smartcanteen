@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { handle, HttpError } from "@/lib/server/http";
 import { query, queryOne } from "@/lib/server/db";
 import { requireRole } from "@/lib/server/auth";
+import { slotId } from "@/lib/server/demo/ids";
 import { istDate, addDays, slotWindowsForDay } from "@/lib/domain";
 
 /**
@@ -25,13 +26,13 @@ export const POST = handle(async () => {
 
   const params: unknown[] = [];
   const values = windows.map((w) => {
-    params.push(w.startsAt.toISOString(), w.endsAt.toISOString(), settings.slot_capacity);
+    params.push(slotId(w.startsAt), w.startsAt.toISOString(), w.endsAt.toISOString(), settings.slot_capacity);
     const n = params.length;
-    return `($${n - 2}::timestamptz, $${n - 1}::timestamptz, $${n}::int)`;
+    return `($${n - 3}::uuid, $${n - 2}::timestamptz, $${n - 1}::timestamptz, $${n}::int)`;
   });
 
   const inserted = await query(
-    `INSERT INTO pickup_slots (starts_at, ends_at, capacity) VALUES ${values.join(", ")}
+    `INSERT INTO pickup_slots (id, starts_at, ends_at, capacity) VALUES ${values.join(", ")}
      ON CONFLICT (starts_at) DO NOTHING
      RETURNING id`,
     params,
