@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Smart Canteen
 
-## Getting Started
-
-First, run the development server:
+College canteen ordering with pickup slots and rotating, signed QR pickup tickets.
+**Runs entirely on built-in demo data. There's no database or external service to set up.**
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Demo accounts
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The login page has one-click buttons for each. The password for all of them is `demo123`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Role | Email | Try |
+| --- | --- | --- |
+| 🎓 Student | `student@demo.com` | Menu, cart, pickup slot, pay, QR tickets |
+| 👨‍🍳 Staff | `staff@demo.com` | Kitchen board, QR scanner |
+| 📊 Owner | `owner@demo.com` | Dashboard, dishes & stock, settings, refunds (plus kitchen/scan) |
 
-## Learn More
+## Demo cases
 
-To learn more about Next.js, take a look at the following resources:
+The student starts with these orders:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Code | State | How to demo it |
+| --- | --- | --- |
+| **DEMOA** | Paid, food **ready** (Masala Dosa + Filter Coffee) | Student → *Tickets* shows a rotating QR. Staff → *Scan QR* scans it (use a second device or the manual box). |
+| **DEMOB** | Paid, **in the kitchen** (Veg Thali preparing, Samosa issued) | Staff → *Kitchen*: move tickets Issued → Preparing → Ready. |
+| **DEMOC** | **Awaiting payment** (Paneer Butter Masala) | Student → *Orders* → open it → *Pay* (simulated UPI) or *Cancel*. |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+There's also history for the owner dashboard: DEMOD (collected) and DEMOE (not collected, 50% refund).
+Seeded live orders stay valid for 12 hours.
 
-## Deploy on Vercel
+**Reset:** the *↺ Reset demo data* link on the login page restores everything above. Restarting the server does the same.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## How the demo data works
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The app's SQL runs against [PGlite](https://pglite.dev), which is Postgres compiled to WASM and running inside the
+Next.js server process (`src/lib/server/db.ts`). The schema and seed live in `src/lib/server/demo/`.
+Changes are kept in memory only.
+
+**On Vercel:** each server instance has its own copy of the data, and a fresh instance starts from the seed.
+That's fine for a single presenter, but data may occasionally reset or differ between devices. For a demo
+where the student and staff phones must see the same data, run it from one machine (`npm run build && npm start`)
+and open it from other devices on the same Wi-Fi via that machine's IP.
+
+## Scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` / `build` / `start` | Next.js |
+| `npm test` | Vitest unit tests (domain rules, QR signing, sessions, redirects) |
+| `npm run typecheck` / `lint` | `tsc --noEmit` / ESLint |
+
+## Optional env
+
+See `.env.example`. Set `SESSION_SECRET` and `TICKET_SIGNING_SECRET` when deploying publicly; otherwise built-in demo defaults are used.
+
+## Not real (demo only)
+
+- Payments are simulated (`UPI_MOCK`). Refunds are recorded for the owner, not paid out.
