@@ -3,6 +3,8 @@
 College canteen ordering with pickup slots and rotating, signed QR pickup tickets.
 **Runs entirely on built-in demo data. There's no database or external service to set up.**
 
+**Live demo: https://smart-canteen-henna.vercel.app**. Sign in with one of the demo accounts below.
+
 ```bash
 npm install
 npm run dev        # http://localhost:3000
@@ -43,6 +45,18 @@ Changes are kept in memory only.
 That's fine for a single presenter, but data may occasionally reset or differ between devices. For a demo
 where the student and staff phones must see the same data, run it from one machine (`npm run build && npm start`)
 and open it from other devices on the same Wi-Fi via that machine's IP.
+
+## Deployment
+
+| | |
+| --- | --- |
+| Production | https://smart-canteen-henna.vercel.app |
+| Hosting | Vercel project `smart-canteen`, connected to [github.com/sid2428/smartcanteen](https://github.com/sid2428/smartcanteen) |
+| Production deploys | Automatic on every push to `main` |
+| Preview deploys | Automatic for other branches and pull requests (private: requires Vercel login) |
+| Production env | `SESSION_SECRET`, `TICKET_SIGNING_SECRET` (set in Vercel → Settings → Environment Variables) |
+
+To deploy manually from a local checkout instead: `npx vercel deploy --prod`.
 
 ## Scripts
 
