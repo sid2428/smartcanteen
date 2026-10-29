@@ -6,6 +6,8 @@ College canteen ordering with pickup slots and rotating, signed QR pickup ticket
 **Live demo: https://smart-canteen-henna.vercel.app**. Sign in with one of the demo accounts below.
 
 ```bash
+git clone https://github.com/sid2428/smartcanteen.git
+cd smartcanteen
 npm install
 npm run dev        # http://localhost:3000
 ```
